@@ -5,12 +5,12 @@ import { LogoGenerationParams, COLORS } from "../types";
 export const generateLogo = async (params: LogoGenerationParams): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  const prompt = `Create a professional, high-quality logo for a brand named "Life Hub". 
+  const prompt = `Create a professional, high-quality logo for a brand named "Logo Hub". 
   The design should follow a ${params.style} style. 
   Concept: ${params.concept}. 
   Mandatory Color Palette: Deep Navy (${COLORS.navy}), Teal (${COLORS.teal}), Sage Green (${COLORS.sage}), and Soft Lavender (${COLORS.lavender}). 
   Requirements: 
-  - Ensure the name "Life Hub" is clearly integrated or present if appropriate for the style.
+  - Ensure the name "Logo Hub" is clearly integrated or present if appropriate for the style.
   - The logo should be versatile, working well on both light and dark backgrounds.
   - No shadows or 3D effects unless specifically requested.
   - Focus on balance, interconnectedness, and growth.

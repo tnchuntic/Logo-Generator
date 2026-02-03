@@ -18,7 +18,7 @@ const App: React.FC = () => {
 
   // Load from local storage on mount
   useEffect(() => {
-    const saved = localStorage.getItem('life-hub-logos');
+    const saved = localStorage.getItem('logo-hub-logos');
     if (saved) {
       setHistory(JSON.parse(saved));
     }
@@ -26,7 +26,7 @@ const App: React.FC = () => {
 
   // Save to local storage whenever history changes
   useEffect(() => {
-    localStorage.setItem('life-hub-logos', JSON.stringify(history));
+    localStorage.setItem('logo-hub-logos', JSON.stringify(history));
   }, [history]);
 
   const handleGenerate = async () => {
@@ -51,7 +51,7 @@ const App: React.FC = () => {
   const downloadLogo = (url: string) => {
     const link = document.createElement('a');
     link.href = url;
-    link.download = `life-hub-logo-${Date.now()}.png`;
+    link.download = `logo-hub-${Date.now()}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -70,7 +70,7 @@ const App: React.FC = () => {
             L
           </div>
           <div>
-            <h1 className="font-bold text-xl text-[#002951]">Life Hub</h1>
+            <h1 className="font-bold text-xl text-[#002951]">Logo Hub</h1>
             <p className="text-xs text-slate-500 uppercase tracking-widest font-semibold">Design Studio</p>
           </div>
         </div>
@@ -169,7 +169,7 @@ const App: React.FC = () => {
         <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <h2 className="text-3xl font-bold text-slate-800">Your Creations</h2>
-            <p className="text-slate-500 mt-1">Generated brand assets for Life Hub</p>
+            <p className="text-slate-500 mt-1">Generated brand assets for Logo Hub</p>
           </div>
           <div className="flex gap-3 text-sm">
             <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-slate-200 shadow-sm">
