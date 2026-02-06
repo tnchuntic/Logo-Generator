@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { LogoStyle, LogoGenerationParams, GeneratedLogo, DEFAULT_COLORS } from './types';
-import { generateLogo, traceImageToSVG } from './services/geminiService';
+import { generateLogo, traceImageToSVG, refineLogo } from './services/geminiService';
 import Button from './components/Button';
 import LogoCard from './components/LogoCard';
 
@@ -9,6 +9,9 @@ const App: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isVectorizing, setIsVectorizing] = useState(false);
   const [history, setHistory] = useState<GeneratedLogo[]>([]);
+  const [selectedLogo, setSelectedLogo] = useState<GeneratedLogo | null>(null);
+  const [refinementText, setRefinementText] = useState('');
+  
   const [params, setParams] = useState<LogoGenerationParams>({
     brandName: 'Life Hub',
     slogan: 'Connected Living',
@@ -37,24 +40,38 @@ const App: React.FC = () => {
     setParams(p => ({ ...p, colors: newColors }));
   };
 
-  const handleGenerate = async () => {
+  const handleMainAction = async () => {
     if (!params.brandName.trim()) {
       setError("Please enter a Brand Name");
       return;
     }
+
     setIsGenerating(true);
     setError(null);
+
     try {
-      const imageUrl = await generateLogo(params);
+      let imageUrl: string;
+      if (selectedLogo && refinementText.trim()) {
+        // REFINEMENT PATH
+        imageUrl = await refineLogo(selectedLogo.url, refinementText, params);
+      } else {
+        // FRESH GENERATION PATH
+        imageUrl = await generateLogo(params);
+      }
+
       const newLogo: GeneratedLogo = {
         id: crypto.randomUUID(),
         url: imageUrl,
-        prompt: `${params.brandName} - ${params.concept}`,
+        prompt: selectedLogo ? `Refinement: ${refinementText}` : `${params.brandName} - ${params.concept}`,
         timestamp: Date.now()
       };
+      
       setHistory(prev => [newLogo, ...prev]);
+      // Clear refinement after success
+      setRefinementText('');
+      setSelectedLogo(null);
     } catch (err: any) {
-      setError(err.message || 'Failed to generate logo. Please try again.');
+      setError(err.message || 'Action failed. Please try again.');
     } finally {
       setIsGenerating(false);
     }
@@ -67,7 +84,6 @@ const App: React.FC = () => {
     try {
       if (format === 'svg') {
         setIsVectorizing(true);
-        // Call AI to trace raster to vector
         const svgContent = await traceImageToSVG(url, params.brandName);
         const blob = new Blob([svgContent], { type: 'image/svg+xml' });
         const downloadUrl = URL.createObjectURL(blob);
@@ -100,7 +116,6 @@ const App: React.FC = () => {
         };
         img.src = url;
       } else {
-        // Default PNG download
         const link = document.createElement('a');
         link.href = url;
         link.download = `${fileName}.png`;
@@ -109,9 +124,7 @@ const App: React.FC = () => {
         document.body.removeChild(link);
       }
     } catch (err) {
-      console.error("Download failed:", err);
-      setError("Conversion failed. Using direct PNG fallback.");
-      // Fallback to standard PNG if conversion fails
+      setError("Download failed. Falling back to PNG.");
       const link = document.createElement('a');
       link.href = url;
       link.download = `${fileName}.png`;
@@ -124,6 +137,16 @@ const App: React.FC = () => {
 
   const deleteLogo = (id: string) => {
     setHistory(prev => prev.filter(logo => logo.id !== id));
+    if (selectedLogo?.id === id) setSelectedLogo(null);
+  };
+
+  const toggleRefine = (logo: GeneratedLogo) => {
+    if (selectedLogo?.id === logo.id) {
+      setSelectedLogo(null);
+    } else {
+      setSelectedLogo(logo);
+      // Optional: scroll to refinement input
+    }
   };
 
   return (
@@ -151,7 +174,6 @@ const App: React.FC = () => {
                 value={params.brandName}
                 onChange={(e) => setParams(p => ({ ...p, brandName: e.target.value }))}
                 className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#04768A] outline-none transition-all"
-                placeholder="e.g. Life Hub"
               />
             </div>
             <div>
@@ -161,16 +183,39 @@ const App: React.FC = () => {
                 value={params.slogan}
                 onChange={(e) => setParams(p => ({ ...p, slogan: e.target.value }))}
                 className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#04768A] outline-none transition-all"
-                placeholder="e.g. Connected Living"
               />
             </div>
           </div>
 
-          {/* Style Section */}
+          {/* Refinement Section (Conditional) */}
+          {selectedLogo && (
+            <div className="bg-[#04768A]/5 p-4 rounded-xl border border-[#04768A]/20 space-y-3 animate-in slide-in-from-top-2 duration-300">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xs font-black text-[#04768A] uppercase tracking-wider">Refine Selection</h3>
+                <button onClick={() => setSelectedLogo(null)} className="text-slate-400 hover:text-rose-500">
+                  <i className="fas fa-times"></i>
+                </button>
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold mb-1 text-slate-500 uppercase">Update Instructions</label>
+                <textarea 
+                  value={refinementText}
+                  onChange={(e) => setRefinementText(e.target.value)}
+                  className="w-full p-2.5 bg-white border border-[#04768A]/30 rounded-lg focus:ring-2 focus:ring-[#04768A] outline-none min-h-[100px] text-sm resize-none shadow-inner"
+                  placeholder="e.g. 'Remove the dots', 'Change the icon to a star', 'Make text larger'..."
+                />
+              </div>
+              <p className="text-[10px] text-slate-500 leading-tight">
+                Gemini will use the selected design as a base and apply your specific requests.
+              </p>
+            </div>
+          )}
+
+          {/* Visual Styles (Only if not in focused refinement or just always there) */}
           <div className="space-y-3">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Visual Style</h3>
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Style Controls</h3>
             <div>
-              <label className="block text-sm font-semibold mb-1.5 text-slate-700">Design Style</label>
+              <label className="block text-sm font-semibold mb-1.5 text-slate-700">Design Aesthetic</label>
               <select 
                 value={params.style}
                 onChange={(e) => setParams(p => ({ ...p, style: e.target.value }))}
@@ -181,19 +226,8 @@ const App: React.FC = () => {
                 ))}
               </select>
             </div>
-
-            <div>
-              <label className="block text-sm font-semibold mb-1.5 text-slate-700">Concept & Narrative</label>
-              <textarea 
-                value={params.concept}
-                onChange={(e) => setParams(p => ({ ...p, concept: e.target.value }))}
-                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#04768A] outline-none min-h-[80px] text-sm resize-none"
-                placeholder="Describe the core message..."
-              />
-            </div>
           </div>
 
-          {/* Color Palette Section */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Color Palette</h3>
             <div className="flex gap-3">
@@ -224,13 +258,13 @@ const App: React.FC = () => {
 
           <div className="pt-4 border-t border-slate-100 mt-2">
             <Button 
-              onClick={handleGenerate} 
+              onClick={handleMainAction} 
               isLoading={isGenerating} 
               className="w-full py-4 text-lg" 
-              variant="primary"
-              icon="fa-wand-magic-sparkles"
+              variant={selectedLogo ? "secondary" : "primary"}
+              icon={selectedLogo ? "fa-sparkles" : "fa-wand-magic-sparkles"}
             >
-              Generate Logo
+              {selectedLogo ? "Refine Concept" : "Create New Logo"}
             </Button>
             {error && <p className="mt-3 text-sm text-rose-500 text-center font-medium bg-rose-50 py-2 rounded-lg">{error}</p>}
           </div>
@@ -241,21 +275,23 @@ const App: React.FC = () => {
       <main className="flex-1 p-8 overflow-y-auto">
         {isVectorizing && (
           <div className="fixed top-8 left-1/2 -translate-x-1/2 z-50 animate-bounce">
-            <div className="bg-[#04768A] text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 font-bold border-2 border-white/20">
+            <div className="bg-[#002951] text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 font-bold border-2 border-white/20">
               <i className="fas fa-microchip animate-pulse"></i>
-              AI Vectorizing... (Tracing Paths)
+              Extracting Vectors...
             </div>
           </div>
         )}
 
         <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
-            <h2 className="text-4xl font-black text-slate-800 tracking-tight">Workspace</h2>
-            <p className="text-slate-500 mt-1">Exporting assets for <span className="text-[#04768A] font-bold">{params.brandName || 'Your Brand'}</span></p>
+            <h2 className="text-4xl font-black text-slate-800 tracking-tight">Studio Workspace</h2>
+            <p className="text-slate-500 mt-1">Iterating on brand assets for <span className="text-[#04768A] font-bold">{params.brandName}</span></p>
           </div>
-          <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-slate-200 shadow-sm text-xs font-bold text-slate-500">
-            <i className="fas fa-bezier-curve text-[#04768A]"></i>
-            TRUE VECTOR SVG SUPPORTED
+          <div className="flex gap-2">
+            <div className="bg-white px-4 py-2 rounded-full border border-slate-200 shadow-sm text-xs font-bold text-slate-500 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+              GEMINI 2.5 ACTIVE
+            </div>
           </div>
         </header>
 
@@ -264,21 +300,25 @@ const App: React.FC = () => {
             <div className="w-24 h-24 rounded-full bg-white shadow-xl shadow-slate-200 flex items-center justify-center mb-8 border border-slate-100">
               <i className="fas fa-layer-group text-4xl text-[#04768A]"></i>
             </div>
-            <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Ready to start?</h3>
+            <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Begin Synthesis</h3>
             <p className="text-slate-500 mt-3 leading-relaxed">
-              Define your brand identity and trigger the Gemini 2.5 engine to synthesize high-fidelity concepts.
+              Define your brand identity and trigger the engine to generate high-fidelity concepts. Once generated, you can refine specific versions.
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-8">
             {isGenerating && (
-              <div className="animate-pulse bg-white rounded-2xl aspect-square flex flex-col items-center justify-center p-10 border-2 border-dashed border-[#04768A]/20 shadow-sm">
+              <div className="animate-pulse bg-white rounded-2xl aspect-square flex flex-col items-center justify-center p-10 border-2 border-dashed border-[#04768A]/20 shadow-sm relative">
                 <div className="relative">
                   <div className="w-20 h-20 rounded-full border-4 border-slate-50 border-t-[#04768A] animate-spin"></div>
-                  <i className="fas fa-paint-brush absolute inset-0 flex items-center justify-center text-[#04768A] animate-pulse"></i>
+                  <i className={`fas ${selectedLogo ? 'fa-magic' : 'fa-paint-brush'} absolute inset-0 flex items-center justify-center text-[#04768A] animate-pulse`}></i>
                 </div>
-                <p className="mt-8 font-black text-slate-800 text-xl tracking-tight">Synthesizing...</p>
-                <p className="text-xs text-slate-400 mt-2 text-center uppercase font-bold tracking-widest">Applying color palette</p>
+                <p className="mt-8 font-black text-slate-800 text-xl tracking-tight">
+                  {selectedLogo ? 'Refining...' : 'Synthesizing...'}
+                </p>
+                <p className="text-[10px] text-slate-400 mt-2 text-center uppercase font-bold tracking-widest">
+                  {selectedLogo ? 'Applying targeted edits' : 'Generating from prompt'}
+                </p>
               </div>
             )}
             
@@ -288,6 +328,8 @@ const App: React.FC = () => {
                 logo={logo} 
                 onDownload={downloadLogo} 
                 onDelete={deleteLogo} 
+                onRefine={toggleRefine}
+                isActive={selectedLogo?.id === logo.id}
               />
             ))}
           </div>
