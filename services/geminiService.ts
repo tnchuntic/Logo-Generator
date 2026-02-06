@@ -45,3 +45,44 @@ export const generateLogo = async (params: LogoGenerationParams): Promise<string
     throw error;
   }
 };
+
+/**
+ * Uses a vision model to trace a raster image into professional SVG code.
+ */
+export const traceImageToSVG = async (base64Data: string, brandName: string): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const base64Content = base64Data.split(',')[1];
+
+  const prompt = `Trace this logo image into clean, professional, and minimalist SVG code.
+  - Convert all shapes into accurate SVG <path>, <circle>, or <rect> elements.
+  - Ensure the colors match the provided image exactly.
+  - Render the text "${brandName}" using high-quality SVG paths or standard web-safe fonts in <text> elements.
+  - The output must be valid, stand-alone SVG XML code.
+  - Do NOT use <image> or embed raster data. Everything must be vector paths.
+  - Return ONLY the SVG code starting with <svg and ending with </svg>. No markdown, no comments.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: [{
+        parts: [
+          { inlineData: { data: base64Content, mimeType: 'image/png' } },
+          { text: prompt }
+        ]
+      }],
+    });
+
+    let svgCode = response.text || '';
+    // Clean up any markdown blocks if the model included them
+    svgCode = svgCode.replace(/```svg/g, '').replace(/```/g, '').trim();
+    
+    if (!svgCode.startsWith('<svg')) {
+      throw new Error("Invalid SVG generated");
+    }
+
+    return svgCode;
+  } catch (error) {
+    console.error("Error tracing SVG:", error);
+    throw error;
+  }
+};
