@@ -1,20 +1,24 @@
 
 import { GoogleGenAI } from "@google/genai";
-import { LogoGenerationParams, COLORS } from "../types";
+import { LogoGenerationParams } from "../types";
 
 export const generateLogo = async (params: LogoGenerationParams): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  const prompt = `Create a professional, high-quality logo for a brand named "Logo Hub". 
-  The design should follow a ${params.style} style. 
-  Concept: ${params.concept}. 
-  Mandatory Color Palette: Deep Navy (${COLORS.navy}), Teal (${COLORS.teal}), Sage Green (${COLORS.sage}), and Soft Lavender (${COLORS.lavender}). 
-  Requirements: 
-  - Ensure the name "Logo Hub" is clearly integrated or present if appropriate for the style.
-  - The logo should be versatile, working well on both light and dark backgrounds.
-  - No shadows or 3D effects unless specifically requested.
-  - Focus on balance, interconnectedness, and growth.
-  ${params.additionalPrompt ? `Additional instructions: ${params.additionalPrompt}` : ''}`;
+  const colorString = params.colors.join(", ");
+  const prompt = `Create a professional, high-quality logo.
+  Brand Name: "${params.brandName}"
+  ${params.slogan ? `Slogan: "${params.slogan}"` : ''}
+  Style: ${params.style}
+  Core Concept: ${params.concept}
+  Required Color Palette: ${colorString}
+  
+  Requirements:
+  - Integrate the Brand Name clearly. ${params.slogan ? 'Optionally include the slogan if it fits the design well.' : ''}
+  - The design should be versatile and look premium.
+  - Avoid generic clip-art. Focus on unique, bespoke iconography.
+  - Use the exact colors provided: ${colorString}.
+  ${params.additionalPrompt ? `Special Instructions: ${params.additionalPrompt}` : ''}`;
 
   try {
     const response = await ai.models.generateContent({

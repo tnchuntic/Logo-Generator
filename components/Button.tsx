@@ -1,7 +1,7 @@
 
 import React from 'react';
-import { COLORS } from '../types';
 
+// FIX: Removed unused and incorrect import of COLORS from '../types' which was causing a build error
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'outline';
   isLoading?: boolean;
